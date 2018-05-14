@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+{% load comment_tags %}
+{% load approve_tags %}
+
+{% block title %}
+	{{ blog.title }}
+{% endblock %}
+
+{% block header_extends %}
+	<script type="text/javascript" src="{% static "ckeditor/ckeditor-init.js" %}"></script>
+	<script type="text/javascript" src="{% static "ckeditor/ckeditor/ckeditor.js" %}"></script>
+	<style type="text/css">
+		div .django-ckeditor-widget{
+			width: 100%;
+		}
+	</style>
+
+{% endblock %}
+
+{% block content %}
+	<div class="container">
+
+		<!-- 博客主题相关信息 -->
+		<div class="row">
+			<div class="col-xs-8 col-xs-offset-2">
+				<h3>{{blog.title}}</h3>
+				<ul class="blog-info-description">
+					<li>作者:{{blog.author}}</li>
+					<li>分类:
+						<a href="{% url "blogs_with_type" blog.blog_type.pk %}">
+							{{blog.blog_type}}
+						</a>
+					</li>
+					<li>发表日期:{{blog.create_time|date:"Y-m-d H:m:s"}}</li>	
+					<li>阅读数量:({{blog.get_read_num}})</li>
+					<li>评论:({% get_comment_count blog %})</li>
+					
+				</ul>
+
+				<!-- 博客内容 -->
+				<div class="blog_content">
+					{{blog.content|safe}}
+				</div>
+
+				<!-- 点赞相关信息 -->
+				<div class="pull-right" onclick="approveEvent(this, '{% get_content_type blog %}', {{ blog.pk }})">
+					<span class="glyphicon glyphicon-thumbs-up {% get_approve_status blog %}" ></span>
+					<span class="approve_num">{% get_approve_count blog %}</span>
+					<span>喜欢</span>
+				</div>
+
+
+				<!-- 关于更多博客信息 -->
+				<div class="blog_more">
+					
+					<p>上一篇: 
+						{% if previous_blog %}
+							<a href="{% url 'blog_detail' previous_blog.pk %}">{{previous_blog.title}}</a>
+						{% else %}
+							已经是第一篇了
+						{% endif %}
+					</p>
+					<p>下一篇: 
+						{% if next_blog %}
+						<a href="{% url 'blog_detail' next_blog.pk %}">{{next_blog.title}}</a>
+					{% else %}
+						已经是最后一篇了
+					{% endif %}
+					</p>
+				</div>
+			</div>
+			
+		</div>
+		
+		<!-- 评论区域 -->
+		<div class="row">
+			<div class="col-xs-8 col-xs-offset-2">
+				<div >
+					<h4>提交评论</h4>
+					<hr>
+					{% if user.is_authenticated %}
+						
+						<form id="comment_form" action="{% url 'update_comment' %}" method="POST" style="overflow:hidden">
+							<label>{{user.username}}已经登录,可以发表评论了</label>
+							<div id="reply_content_container" style="display: none;">
+								<p>回复:</p>
+								<div id="reply_content"></div>
+								
+							</div>
+							{% csrf_token %}
+							{% get_comment_form blog as comment_form %}
+							{% for field in comment_form %}
+								{{field}}
+							{% endfor %}
+
+							<span id="comment_error" class="text-danger pull-left"></span>
+							<input type="submit"  value="评论" class="btn btn-primary pull-right" style="float: right;">
+
+						</form>
+
+					{% else %}
+						尚未登录,登录后才能评论~
+						<a class="btn-primary" href="{% url 'signin' %}?from={{request.get_full_path}}" >登录</a> |
+						<a class="btn-info" href="{% url 'signup' %}?from={{request.get_full_path}}" >注册</a>
+					{% endif %}
+				</div>				
+			</div>
+
+			<!-- 评论列表 -->
+			<div class="col-xs-8 col-xs-offset-2">
+				<div id="comment_list">
+					<h4>评论列表</h4>
+					<hr>
+					{% get_comment_list blog as comments %}
+					{% for comment in comments %}
+						<div class="comment">
+
+							<span>{{ comment.user.username }}</span>
+							<span>{{ comment.comment_time|date:"Y-m-d H:m:s" }}:</span>
+
+							<div id="comment_{{ comment.pk }}">
+								<span>{{ comment.text|safe }}</span>
+							</div>
+
+							<div class="approve pull-right" onclick="approveEvent(this, '{% get_content_type comment %}', {{ comment.pk }})">
+								<span class="glyphicon glyphicon-thumbs-up {% get_approve_status comment %}" ></span>
+								<span class="approve_num">{% get_approve_count comment %}</span>
+					
+							</div>
+
+							<a href="javascript:reply({{ comment.pk }})">回复</a>
+							
+							{% for reply in comment.root_comment.all %}
+								<div class="reply">
+
+									<span>{{ reply.user.username }}</span>
+									<span>{{ reply.comment_time|date:"Y-m-d H:m:s" }}:</span>
+
+									<span>回复</span>
+									<span>{{ reply.reply_to.username }}</span>
+
+									<div id="comment_{{ reply.pk }}">
+										<span>{{ reply.text|safe }}</span>
+									</div>
+
+									<div class="approve pull-right" onclick="approveEvent(this, '{% get_content_type reply %}', {{ reply.pk }})">
+										<span class="glyphicon glyphicon-thumbs-up {% get_approve_status reply %}" ></span>
+										<span class="approve_num">{% get_approve_count reply %}</span>
+							
+									</div>
+
+
+									<a href="javascript:reply({{ reply.pk}})">回复</a>
+								</div>
+							{% endfor %}			
+						</div>
+
+					{% empty %}
+						<span>暂无评论</span>
+					{% endfor %}
+					
+				</div>
+					
+			</div>
+			
+		</div>
+
+		<!-- 登录模态框 -->
+		<div class="modal fade" id="loginModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+			<div class="modal-dialog modal-sm" role="document">
+			    <div class="modal-content">
+			    	<form id="login_medal_form" action="" method="POST">
+			    		{% csrf_token %}
+
+					    <div class="modal-header">
+					        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+					        <h4 class="modal-title" >登录</h4>
+					    </div>
+					    <div class="modal-body">
+
+					    	{% for field in login_form %}
+					    		<label for="{{ field.id_for_label }}">{{ field.label }}</label>
+					    		{{ field }}
+					        {% endfor %}
+					        <span id="login_medal_tip" class="text-danger"></span>
+
+					    </div>
+					    <div class="modal-footer">
+
+					    	<button type="submit" class="btn btn-primary">登录</button>
+					        <button type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+					        
+					    </div>
+				    </form>
+			    </div>
+			</div>
+		</div>
+
+
+		
+	</div>
+
+{% endblock %}
+
+{% block js %}
+	<script type="text/javascript">
+
+		// 回复函数
+		function reply(reply_comment_id){
+            // 设置值
+            $('#reply_comment_id').val(reply_comment_id);
+            var html = $("#comment_" + reply_comment_id).html();
+            $('#reply_content').html(html);
+            $('#reply_content_container').show();
+            $('html').animate({scrollTop: $('#comment_form').offset().top - 60}, 300, function(){
+                CKEDITOR.instances['id_text'].focus();
+            });
+        }
+
+		function numFormat(num){
+            return ('00' + num).substr(-2);
+        };
+
+        // 时间处理
+        function timeFormat(timestamp){
+            var datetime = new Date(timestamp * 1000);
+            var year = datetime.getFullYear();
+            var month = numFormat(datetime.getMonth() + 1);
+            var day = numFormat(datetime.getDate());
+            var hour = numFormat(datetime.getHours());
+            var minute = numFormat(datetime.getMinutes());
+            var second = numFormat(datetime.getSeconds());
+            return year + '-' + month + '-' + day + ' ' + hour + ':' + minute + ':' + second;
+        };
+
+        // 评论提交ajax
+        $("#comment_form").submit(function(){
+            // 判断是否为空
+            $("#comment_error").text('');
+            if(CKEDITOR.instances["id_text"].document.getBody().getText().trim()==''){
+                $("#comment_error").text('评论内容不能为空');
+                return false;
+            }
+            // 更新数据到textarea
+            CKEDITOR.instances['id_text'].updateElement();
+            // 异步提交
+            $.ajax({
+                url: "{% url 'update_comment' %}",
+                type: 'POST',
+                data: $(this).serialize(),
+                cache: false,
+                success: function(data){
+                    console.log(data);
+                    if(data['status']=="SUCCESS"){
+                        if($('#reply_comment_id').val()=='0'){
+                            // 插入评论
+                            var comment_html = '<div id="root_' + data['pk'] + '" class="comment"><span>' + data['username'] + '</span><span> (' + data['comment_time'] + ')：</span><div id="comment_' + data['pk'] + '">' + data['text'] + '</div><a href="javascript:reply(' + data['pk'] + ');">回复</a></div>';
+                            $("#comment_list").prepend(comment_html);
+                        }else{ 
+                            // 插入回复
+                            var reply_html ='<div class="reply"><span>' + data['username'] + '</span><span> (' + data['comment_time'] + ')</span><span> 回复 </span><span>' + data['reply_to'] + '：</span><div id="comment_' + data['pk'] + '">' + data['text'] + '</div><a href="javascript:reply(' + data['pk'] + ');">回复</a></div>';
+                            $("#root_" + data['root_pk']).append(reply_html);
+                        }
+                        
+                        // 清空编辑框的内容
+                        CKEDITOR.instances['id_text'].setData('');
+                        $('#reply_content_container').hide();
+                        $('#reply_comment_id').val('0');
+                        $('#no_comment').remove();
+                        $("#comment_error").text("评论成功");
+                    }else{
+                        // 显示错误信息
+                        $("#comment_error").text(data['msg']);
+                    }                    
+                },
+                error: function(xhr){
+                    console.log(xhr);
+                }
+            });
+            return false;
+        });
+
+
+        function approveEvent(obj, content_type, object_id){
+            var is_approved = obj.getElementsByClassName('active').length == 0
+            $.ajax({
+                url: "{% url 'approve_change' %}",
+                type: 'GET',
+                data: {
+                    content_type: content_type,
+                    object_id: object_id,
+                    is_approved: is_approved
+                },
+                cache: false,
+                success: function(data){
+                    console.log(data)
+                    if(data['status']=='SUCCESS'){
+                        // 更新点赞状态
+                        var element = $(obj.getElementsByClassName('glyphicon'));
+                        if(is_approved){
+                            element.addClass('active');
+                        }else{
+                            element.removeClass('active');
+                        }
+                        // 更新点赞数量
+                        var approve_num = $(obj.getElementsByClassName('approve_num'));
+                        approve_num.text(data['approve_num']);
+
+        
+                    }else{
+
+                    	if(data["code"]==400){
+                    		 $('#loginModal').modal('show');
+                    	}else{
+                    		alert(data['message']);  
+                    	}
+                    }
+                },
+                error: function(xhr){
+                    console.log(xhr)
+                }
+            });
+        }
+
+
+        $("#login_medal_form").submit(function(event){
+            event.preventDefault();
+            $.ajax({
+                url: '{% url "login_for_medal" %}',
+                type: 'POST',
+                data: $(this).serialize(),
+                cache: false,
+                success: function(data){
+                    if(data['status']=='SUCCESS'){
+                        window.location.reload();
+                    }else{
+                        $('#login_medal_tip').text('用户名或密码不正确');
+                    }
+                }
+            });
+        });
+
+    </script>
+
+{% endblock %}
+
+
+

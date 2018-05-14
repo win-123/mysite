@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title%}
+	我的站点|个人信息
+{% endblock%}
+
+
+{% block content %}
+
+	<div class="containter">
+		<div class="row">
+			<div class="col-xs-10 col-xs-offset-1">
+				<h4>{{ user.username }}</h4>
+				<ul>
+					<li>
+						昵称:
+						{% if user.nickname %}
+							<span>{{ user.nickname }}</span>
+						{% else %}
+							<span>还没有呢称,给自己命名吧</span>
+						{% endif %}
+						
+					</li>
+					<li>
+						邮箱:
+						{% if user.email %}
+							<span>{{ user.email }}</span>
+						{% else %}
+							<span>未填写</span>
+						{% endif %}
+					</li>
+
+					<li>
+						上次登录时间:
+						{% if user.email %}
+							<span>{{ user.last_login|date:"Y-m-d H:m:s" }}</span>
+						{% else %}
+							<span>欢迎回来!</span>
+						{% endif %}
+					</li>
+
+				</ul>
+
+			</div>
+		</div>
+		
+	</div>
+	
+{% endblock%}
+
+
+
+
+

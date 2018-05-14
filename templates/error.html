@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% load staticfiles %}
+
+{% block title%}
+	error|错误
+{% endblock%}
+
+{% block content %}
+
+	<p>{{msg}}</p>
+	<a href="{{ redirect_to }}">返回</a>
+	
+{% endblock%}
